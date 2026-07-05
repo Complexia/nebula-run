@@ -1,0 +1,7 @@
+{
+  "name": "nebula-run",
+  "private": true,
+  "scripts": {
+    "start": "node serve.mjs"
+  }
+}

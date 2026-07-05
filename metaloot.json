@@ -1,0 +1,9 @@
+{
+  "$schema": "https://metaloot/docs",
+  "slug": "nebula-run",
+  "name": "Nebula Run",
+  "entry": "index.html",
+  "build": null,
+  "output": ".",
+  "sdk": "vendor/metaloot.js"
+}

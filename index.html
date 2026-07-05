@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>NEBULA RUN — Velocity Drift</title>
+<style>
+  :root {
+    --bg: rgba(4, 6, 18, 0.88);
+    --panel: rgba(6, 9, 26, 0.92);
+    --line: rgba(180, 120, 255, 0.35);
+    --cyan: #00f0ff;
+    --purple: #c026ff;
+    --magenta: #ff4fd8;
+    --orange: #ff8a00;
+    --pink: #ff6ad8;
+    --gold: #ffe066;
+    --text: #e8f0ff;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html, body { width:100%; height:100%; overflow:hidden; background:#02050f; color:var(--text); }
+  body { font-family: "Avenir Next", "Segoe UI", system-ui, -apple-system, sans-serif; -webkit-user-select:none; user-select:none; }
+  #app { position:fixed; inset:0; }
+  canvas { display:block; }
+
+  /* HUD */
+  #hud { position:fixed; inset:0; pointer-events:none; display:none; }
+  .hud-on #hud { display:block; }
+
+  .panel {
+    position:absolute; background:var(--panel); border:1px solid var(--line);
+    border-radius:10px; padding:8px 14px; backdrop-filter:blur(8px);
+    box-shadow: 0 0 0 1px rgba(0,0,0,0.6);
+  }
+
+  /* Top left score */
+  #scorebox { left:24px; top:18px; }
+  #score { font-size:28px; font-weight:800; letter-spacing:-0.02em; color:#fff; line-height:1; }
+  #score .num { color:#ff6ad8; }
+  #combo { margin-top:2px; font-size:13px; letter-spacing:0.14em; color:var(--purple); font-weight:700; }
+  #shield { margin-top:7px; line-height:1; }
+  #shield .pip { display:inline-block; width:9px; height:9px; margin-right:7px; background:var(--cyan); transform:rotate(45deg); box-shadow:0 0 7px var(--cyan); transition:background .15s, box-shadow .15s; }
+  #shield .pip.off { background:rgba(255,255,255,0.12); box-shadow:none; }
+
+  /* Top center / timer area */
+  #timerbox { left:50%; top:16px; transform:translateX(-50%); text-align:center; padding:6px 18px; min-width:210px; }
+  #lap { font-size:15px; letter-spacing:0.3em; font-weight:700; color:#fff; }
+  #time { font-size:22px; font-weight:700; letter-spacing:0.08em; color:var(--cyan); margin-top:-2px; font-variant-numeric:tabular-nums; }
+  #best { font-size:11px; letter-spacing:0.2em; color:var(--gold); margin-top:1px; }
+  #best span { opacity:0.75; }
+
+  /* Top right */
+  #trackbox { right:22px; top:18px; text-align:right; }
+  #trackname { font-size:11px; letter-spacing:0.35em; text-transform:uppercase; color:var(--magenta); }
+  #speed { font-size:32px; font-weight:800; letter-spacing:-0.02em; line-height:1; color:#fff; margin-top:2px; }
+  #speed small { font-size:11px; letter-spacing:0.2em; opacity:0.6; }
+
+  /* Bottom left boost */
+  #boostwrap { position:absolute; left:24px; bottom:26px; }
+  #boostring { width:82px; height:82px; position:relative; }
+  #boostring svg { width:82px; height:82px; transform:rotate(-90deg); }
+  #boostring .bg { fill:none; stroke:rgba(255,255,255,0.1); stroke-width:5; }
+  #boostring .fg { fill:none; stroke:var(--purple); stroke-width:5; stroke-linecap:round; transition:stroke-dashoffset .06s linear; }
+  #boostpct { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); font-size:15px; font-weight:700; color:#fff; letter-spacing:0.02em; }
+  #boostlabel { margin-top:4px; font-size:10px; letter-spacing:0.3em; text-align:center; color:var(--purple); }
+
+  /* Bottom center speed large */
+  #speedhud { position:absolute; left:50%; bottom:42px; transform:translateX(-50%); text-align:center; }
+  #speedbig { font-size:38px; font-weight:800; letter-spacing:0; color:#fff; line-height:1; text-shadow:0 0 18px rgba(255,106,216,0.36); }
+  #speedunit { font-size:12px; letter-spacing:0.3em; color:var(--cyan); margin-top:-4px; }
+
+  /* Mini map / track preview */
+  #minimap { position:absolute; right:22px; bottom:24px; width:148px; height:74px; background:rgba(4,6,18,0.75); border:1px solid var(--line); border-radius:8px; overflow:hidden; }
+  #minimap canvas { width:100%; height:100%; display:block; opacity:0.95; }
+
+  /* Center vignette + speed streaks hint */
+  #vignette { position:absolute; inset:0; pointer-events:none; background:radial-gradient(circle at 50% 55%, transparent 55%, rgba(2,3,12,0.45) 82%); }
+  #speedfx { position:absolute; inset:0; pointer-events:none; background:linear-gradient(transparent, rgba(0,240,255,0.035) 40%, transparent); mix-blend-mode:screen; }
+  #hitflash { position:absolute; inset:0; pointer-events:none; background:radial-gradient(circle at 50% 55%, transparent 35%, rgba(255,60,90,0.4)); opacity:0; transition:opacity .12s; }
+
+  /* Overlays */
+  .overlay {
+    position:fixed; inset:0; display:flex; align-items:center; justify-content:center; flex-direction:column;
+    background:radial-gradient(ellipse at 50% 32%, rgba(6,8,22,0.94), rgba(2,3,10,0.98));
+    z-index:20; text-align:center;
+  }
+  .overlay.hidden { display:none; }
+
+  .ov-phase { font-size:12px; letter-spacing:0.6em; text-transform:uppercase; color:var(--cyan); margin-bottom:6px; }
+  .ov-title {
+    font-size:64px; font-weight:800; letter-spacing:0.08em; text-transform:uppercase; line-height:1;
+    background:linear-gradient(180deg,#f0d4ff,#c026ff 45%,#7a3cff);
+    -webkit-background-clip:text; background-clip:text; color:transparent;
+    text-shadow:0 0 60px rgba(192,38,255,0.35);
+  }
+  .ov-sub { max-width:520px; margin-top:14px; font-size:14px; line-height:1.55; opacity:0.8; letter-spacing:0.02em; }
+  .controls { display:grid; grid-template-columns:auto auto; gap:6px 26px; margin-top:24px; font-size:12.5px; text-align:left; letter-spacing:0.06em; }
+  .controls .k { color:var(--cyan); font-weight:700; text-align:right; }
+  .bigbtn {
+    margin-top:28px; font-size:15px; letter-spacing:0.38em; text-transform:uppercase; color:#0a0618;
+    background:linear-gradient(90deg,#c026ff,#ff6ad8); border:none; border-radius:32px; padding:14px 52px; cursor:pointer;
+    font-weight:800; box-shadow:0 0 28px rgba(192,38,255,0.5);
+  }
+  .bigbtn:hover { transform:scale(1.03); filter:brightness(1.08); }
+  .smallnote { margin-top:18px; font-size:10px; letter-spacing:0.2em; opacity:0.5; }
+
+  .ov-stats { margin-top:18px; font-size:13px; letter-spacing:0.1em; }
+  .ov-stats .v { color:var(--gold); font-weight:700; }
+
+  /* In-game floating elements */
+  #toast { position:absolute; left:50%; bottom:110px; transform:translateX(-50%); font-size:13px; letter-spacing:0.12em; padding:6px 16px; background:var(--panel); border:1px solid var(--line); border-radius:20px; opacity:0; transition:opacity .25s; }
+  #toast.show { opacity:1; }
+
+  #mlchip { position:fixed; left:50%; bottom:10px; transform:translateX(-50%); z-index:30; display:none; align-items:center; gap:8px; max-width:min(520px, calc(100vw - 32px)); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-size:10px; letter-spacing:0.08em; color:rgba(232,240,255,0.72); background:rgba(6,9,26,0.72); border:1px solid rgba(180,120,255,0.28); border-radius:20px; padding:4px 12px; backdrop-filter:blur(8px); }
+  #mlchip a { color:#5df4ff; }
+  #mlchip img { width:16px; height:16px; border-radius:50%; }
+
+  /* subtle grid on start */
+  .nebula-bg { position:absolute; inset:0; background:
+    radial-gradient(circle at 30% 20%, rgba(180,80,255,0.08) 0%, transparent 55%),
+    radial-gradient(circle at 72% 70%, rgba(0,230,255,0.06) 0%, transparent 50%);
+    pointer-events:none;
+  }
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<div id="hud">
+  <div id="vignette"></div>
+  <div id="speedfx"></div>
+  <div id="hitflash"></div>
+
+  <!-- Score -->
+  <div class="panel" id="scorebox">
+    <div id="score"><span class="num">0</span></div>
+    <div id="combo">x1.0 COMBO</div>
+    <div id="shield"><i class="pip"></i><i class="pip"></i><i class="pip"></i></div>
+  </div>
+
+  <!-- Timer / Lap -->
+  <div class="panel" id="timerbox">
+    <div id="lap">01 / 08</div>
+    <div id="time">00:00.0</div>
+    <div id="best">BEST <span id="besttime">01:18.92</span></div>
+  </div>
+
+  <!-- Track + Speed -->
+  <div class="panel" id="trackbox">
+    <div id="trackname">TRACK 01 — ECLIPSE LOOP</div>
+    <div id="speed"><span id="speedval">1,280</span><small> KM/H</small></div>
+  </div>
+
+  <!-- Boost -->
+  <div id="boostwrap">
+    <div id="boostring">
+      <svg viewBox="0 0 100 100">
+        <circle class="bg" cx="50" cy="50" r="42"/>
+        <circle class="fg" id="boostarc" cx="50" cy="50" r="42"
+          stroke-dasharray="263.9" stroke-dashoffset="0"/>
+      </svg>
+      <div id="boostpct">00</div>
+    </div>
+    <div id="boostlabel">BOOST</div>
+  </div>
+
+  <!-- Large speed -->
+  <div id="speedhud">
+    <div id="speedbig">1280</div>
+    <div id="speedunit">KM/H</div>
+  </div>
+
+  <!-- Minimap -->
+  <div id="minimap"><canvas id="minimapcanvas" width="148" height="74"></canvas></div>
+
+  <div id="toast"></div>
+</div>
+
+<!-- Start -->
+<div class="overlay" id="startov">
+  <div class="nebula-bg"></div>
+  <div class="ov-phase">A METALOOT VELOCITY PROTOCOL</div>
+  <div class="ov-title">NEBULA RUN</div>
+  <div class="ov-sub">
+    Race the neon lane through 8 sectors to the finish gate.<br>
+    Thread the rings, grab the energy orbs, dodge the blocks — you have 3 shields.
+  </div>
+  <div class="controls">
+    <div class="k">A / D</div><div>Steer</div>
+    <div class="k">SPACE</div><div>Boost (uses meter)</div>
+    <div class="k">SHIFT</div><div>Brake (refills boost)</div>
+    <div class="k">ESC / P</div><div>Pause</div>
+    <div class="k">R</div><div>Restart run</div>
+  </div>
+  <button class="bigbtn" id="startbtn">LAUNCH</button>
+  <div id="besttext" style="margin-top:12px;font-size:12px;letter-spacing:0.18em;opacity:0.6;"></div>
+  <div class="smallnote">DESKTOP + MOUSE • SOUND RECOMMENDED</div>
+</div>
+
+<!-- Death -->
+<div class="overlay hidden" id="deathov">
+  <div class="ov-phase">RUN TERMINATED</div>
+  <div class="ov-title" style="background:linear-gradient(180deg,#ff9a9e,#c026ff);-webkit-background-clip:text;background-clip:text;">CRASHED</div>
+  <div class="ov-sub" id="deathcause">Impact detected. The lane destabilized.</div>
+  <div class="ov-stats" id="deathstats"></div>
+  <button class="bigbtn" id="retrybtn">RELAUNCH</button>
+</div>
+
+<!-- Complete -->
+<div class="overlay hidden" id="winov">
+  <div class="ov-phase">SECTOR CLEARED</div>
+  <div class="ov-title" style="background:linear-gradient(180deg,#a0f0ff,#00f0ff);-webkit-background-clip:text;background-clip:text;">NEBULA CLEARED</div>
+  <div class="ov-sub">You rode the edge of light. The archives recorded every photon.</div>
+  <div class="ov-stats" id="winstats"></div>
+  <button class="bigbtn" id="againbtn">RUN AGAIN</button>
+</div>
+
+<!-- Pause -->
+<div class="overlay hidden" id="pauseov">
+  <div class="ov-title" style="font-size:38px; background:linear-gradient(180deg,#e0e8ff,#c026ff);-webkit-background-clip:text;background-clip:text;">PAUSED</div>
+  <div class="ov-sub">Press ESC / P or click to continue the drift.</div>
+  <button class="bigbtn" id="resumebtn">RESUME RUN</button>
+</div>
+
+<div id="mlchip"></div>
+
+<script src="./vendor/metaloot.js"></script>
+<script type="importmap">{"imports":{"three":"./vendor/three.module.js"}}</script>
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>
