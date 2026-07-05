@@ -6,11 +6,20 @@ lane, thread the octagon gates, and reach the finish at the end of sector 8.
 ## Play
 
 ```bash
-node serve.mjs
+npm install
+npm start
 # open http://localhost:8741
 ```
 
 No build. Everything is procedural + vendored Three.js.
+
+Metaloot auth needs server-side environment variables. Copy `.env.example` to
+`.env` for local play, and set the same values in Railway for production:
+
+- `METALOOT_CLIENT_ID`
+- `METALOOT_CLIENT_SECRET`
+- `METALOOT_SESSION_SECRET`
+- `METALOOT_REDIRECT_URI`
 
 ## Controls
 
@@ -38,4 +47,4 @@ No build. Everything is procedural + vendored Three.js.
   than visuals — grazes are forgiven
 - Same seed every run: the track is learnable for time-attack
 - Synth WebAudio engine hum + pickup / gate / hit / crash sfx
-- Metaloot platform integration for cloud saves and rewards
+- Login with Metaloot through `@metaloot/auth`

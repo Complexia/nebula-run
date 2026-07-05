@@ -103,6 +103,8 @@
   }
   .bigbtn:hover { transform:scale(1.03); filter:brightness(1.08); }
   .smallnote { margin-top:18px; font-size:10px; letter-spacing:0.2em; opacity:0.5; }
+  #metaloot-auth { margin-top:18px; min-height:48px; position:relative; z-index:1; }
+  #metaloot-auth .metaloot-auth-button { border-radius:32px; letter-spacing:0.08em; text-transform:uppercase; }
 
   .ov-stats { margin-top:18px; font-size:13px; letter-spacing:0.1em; }
   .ov-stats .v { color:var(--gold); font-weight:700; }
@@ -193,6 +195,7 @@
     <div class="k">R</div><div>Restart run</div>
   </div>
   <button class="bigbtn" id="startbtn">LAUNCH</button>
+  <div id="metaloot-auth"></div>
   <div id="besttext" style="margin-top:12px;font-size:12px;letter-spacing:0.18em;opacity:0.6;"></div>
   <div class="smallnote">DESKTOP + MOUSE • SOUND RECOMMENDED</div>
 </div>
@@ -224,8 +227,15 @@
 
 <div id="mlchip"></div>
 
-<script src="./vendor/metaloot.js"></script>
 <script type="importmap">{"imports":{"three":"./vendor/three.module.js"}}</script>
+<script type="module">
+  import { mountMetalootAuth } from '/vendor/@metaloot/auth/browser.js';
+
+  window.nebulaMetalootAuth = mountMetalootAuth('#metaloot-auth', {
+    gameName: 'Nebula Run',
+    showUser: false,
+  });
+</script>
 <script type="module" src="./src/main.js"></script>
 </body>
 </html>

@@ -1,26 +1,50 @@
-// Tiny zero-dependency static server for local play: `node serve.mjs`
-import { createServer } from 'node:http';
-import { readFile } from 'node:fs/promises';
-import { extname, join, normalize } from 'node:path';
+import 'dotenv/config';
+import express from 'express';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { metalootAuth } from '@metaloot/auth/node';
 
-const ROOT = new URL('.', import.meta.url).pathname;
+const ROOT = dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 8741;
-const MIME = {
-  '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript',
-  '.css': 'text/css', '.json': 'application/json', '.png': 'image/png',
-  '.svg': 'image/svg+xml', '.ico': 'image/x-icon',
-};
+const REDIRECT_URI =
+  process.env.METALOOT_REDIRECT_URI ||
+  'https://nebula-run-production.up.railway.app/auth/metaloot/callback';
 
-createServer(async (req, res) => {
-  try {
-    let p = decodeURIComponent(new URL(req.url, 'http://x').pathname);
-    if (p === '/') p = '/index.html';
-    const file = normalize(join(ROOT, p));
-    if (!file.startsWith(ROOT)) { res.writeHead(403); res.end(); return; }
-    const data = await readFile(file);
-    res.writeHead(200, { 'Content-Type': MIME[extname(file)] || 'application/octet-stream', 'Cache-Control': 'no-cache' });
-    res.end(data);
-  } catch {
-    res.writeHead(404); res.end('not found');
-  }
-}).listen(PORT, () => console.log(`Nebula Run at http://localhost:${PORT}`));
+function requireEnv(name) {
+  const value = process.env[name];
+  if (!value) throw new Error(`Missing required environment variable: ${name}`);
+  return value;
+}
+
+const app = express();
+
+// Railway terminates HTTPS before Node; trust it so the adapter can detect
+// forwarded HTTPS and emit SameSite=None; Secure cookies in production.
+app.set('trust proxy', 1);
+
+app.use(
+  metalootAuth({
+    clientId: requireEnv('METALOOT_CLIENT_ID'),
+    clientSecret: requireEnv('METALOOT_CLIENT_SECRET'),
+    sessionSecret: requireEnv('METALOOT_SESSION_SECRET'),
+    redirectUri: REDIRECT_URI,
+  }),
+);
+
+app.use('/vendor/@metaloot/auth', express.static(join(ROOT, 'node_modules/@metaloot/auth/dist')));
+app.use(
+  express.static(ROOT, {
+    etag: false,
+    setHeaders(res) {
+      res.setHeader('Cache-Control', 'no-cache');
+    },
+  }),
+);
+
+app.use((req, res) => {
+  res.status(404).type('text/plain').send('not found');
+});
+
+app.listen(PORT, () => {
+  console.log(`Nebula Run at http://localhost:${PORT}`);
+});

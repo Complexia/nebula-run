@@ -3,5 +3,10 @@
   "private": true,
   "scripts": {
     "start": "node serve.mjs"
+  },
+  "dependencies": {
+    "@metaloot/auth": "^0.1.1",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1"
   }
 }

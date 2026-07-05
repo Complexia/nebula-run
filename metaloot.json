@@ -5,5 +5,5 @@
   "entry": "index.html",
   "build": null,
   "output": ".",
-  "sdk": "vendor/metaloot.js"
+  "sdk": null
 }
